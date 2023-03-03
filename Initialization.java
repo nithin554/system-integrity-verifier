@@ -66,6 +66,9 @@ class Initialization {
                     dir = getDirName(output[index + 1]);
                     index += 3;
                 }
+                if (index >= length) {
+                    break;
+                }
                 writer.append(parseLine(output[index], dir));
                 writer.newLine();
             }
