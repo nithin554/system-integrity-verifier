@@ -1,0 +1,149 @@
+#!/bin/bash
+
+START_TIME_SECONDS=$(date +%s)
+MODE=""
+MON_DIR=""
+verification_file=""
+report_file=""
+hashes=("sha1 md5")
+HASH=""
+
+checkArgs() {
+    if [ ! $2 ]
+    then
+        echo "Error: invalid usage. Missing -D option. Check usage with ./siv -h"
+        exit
+    fi
+    if [ $2 = "-D" ]
+    then
+        MON_DIR="$(realpath $(dirname $3))/$(basename $3)"
+    else
+        echo "Error: invalid usage. check usage with ./siv -h"
+        exit
+    fi
+    if [ ! $4 ]
+    then
+        echo "Error: invalid usage. Missing -V option. Check usage with ./siv -h"
+        exit
+    fi
+    if [ $4 = "-V" ]
+    then
+        if [ ! $5 ]
+        then
+            echo "Error: invalid usage. Missing verification file path. Check usage with ./siv -h"
+            exit
+        fi
+        verification_file=$(realpath $(dirname $5))
+        if [ $verification_file = $MON_DIR ]
+        then
+            echo Error: Verify the location of the verification file. Verification file should be outside the monitoring directory 
+            exit
+        fi
+        verification_file=$(realpath $(dirname $5))/$(basename $5)
+    else
+        echo "Error: invalid usage. check usage with ./siv -h"
+        exit
+    fi
+    if [ ! $6 ]
+    then
+        echo "Error: invalid usage. Missing -R option. Check usage with ./siv -h"
+        exit
+    fi
+    if [ $6 = "-R" ]
+    then
+        if [ ! $5 ]
+        then
+            echo "Error: invalid usage. Missing report file path. Check usage with ./siv -h"
+            exit
+        fi
+        report_file=$(realpath $(dirname $7))
+        if [ $report_file = $MON_DIR ]
+        then
+            echo Error: Verify the location of the report file. Report file should be outside the monitoring directory 
+            exit
+        fi
+        report_file=$(realpath $(dirname $7))/$(basename $7)
+    else
+        echo "Error: invalid usage. check usage with ./siv -h"
+        exit
+    fi
+    if [ $MODE = "INIT" ]
+    then
+        if [ ! $8 ]
+        then
+            echo "Error: invalid usage. Missing hash function. Check usage with ./siv -h"
+            exit
+        fi
+        if [ $8 = "-H" ]
+        then
+            if [ ! $9 ]
+            then
+                echo "Error: invalid usage. Missing hash function. Check usage with ./siv -h"
+                exit
+            fi
+            HASH=$9
+            if [[ ! " ${hashes[*]} " =~ " ${HASH} " ]]; then
+                echo Error: invalid hash function. Valid hash functions are sha1 and md5
+                exit
+            fi
+        else
+            echo "Error: invalid usage. check usage with ./siv -h"
+            exit
+        fi
+    fi
+}
+
+checkIfDirExists() {
+    if [ -d "$MON_DIR" ] 
+    then
+        echo "Directory $MON_DIR exists..." 
+    else
+        echo "Error: Directory $MON_DIR does not exists."
+        exit
+    fi
+}
+
+initializeVerificationFileAndReportFile() {
+    echo "Path,Size(bytes),User,Group,Access_Rights,Modification_Date,Hash($HASH)" > "$verification_file.csv"
+    touch "$report_file.txt"
+    truncate -s 0 "$report_file.txt"
+}
+
+prepareVerificationFile() {
+    file_listing=$(ls -lR $MON_DIR)
+    java Initialization.java $MON_DIR "$file_listing" $HASH "$verification_file.csv" "$report_file.txt" $START_TIME_SECONDS
+}
+
+if [ ! $1 ]
+then
+    MODE="HELP"
+elif [ $1 = "-i" ]
+then
+    MODE="INIT"
+elif [ $1 = "-v" ]
+then
+    MODE="VERIFY"
+elif [ $1 = "-h" ]
+then
+    MODE="HELP"
+else
+    echo invalid argument $1
+    exit
+fi
+
+# HELP mode
+if [ $MODE = "HELP" ]
+then
+    echo "siv usage: ./siv <-i|-v|-h> -D <monitored_directory> -V <verification_file> -R <report_file> -H <hash_function>"
+    echo "supported hash functions are sha1 AND md5"
+    exit
+fi
+
+# INIT mode
+if [ $MODE = "INIT" ]
+then
+    checkArgs "$@"
+    checkIfDirExists
+    initializeVerificationFileAndReportFile
+    prepareVerificationFile
+fi
